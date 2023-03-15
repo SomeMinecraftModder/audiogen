@@ -1,14 +1,15 @@
-import keras.models
-import numpy as np
-from keras.models import Sequential
-from keras.layers import LSTM, Dense, Dropout
 import os
+import numpy as np
+from keras import Input
+from keras.models import Model
+from keras.layers import LSTM, Dense, Dropout, Conv1D, MaxPooling1D, Flatten, Reshape, GRU
+import tensorflow as tf
 
 from tqdm import trange, tqdm
 
 os.environ["XLA_FLAGS"] = "--xla_gpu_cuda_data_dir=/opt/cuda"
 
-with open("realdonaldtrump.csv", mode="rb") as f:
+with open("data_final.wav", mode="rb") as f:
     our_data = f.read()[:2_000_000]
 
 data = []
@@ -40,15 +41,21 @@ print(train_data.shape)
 print(train_labels.shape)
 
 # Define the LSTM model
-model = Sequential()
-model.add(LSTM(64, input_shape=(max_len, 1), return_sequences=True))
-model.add(LSTM(64))
-model.add(Dense(256, activation='softmax'))
+inputs = Input(shape=(max_len, 1))
+x = GRU(128, return_sequences=True)(inputs)
+x = GRU(64, return_sequences=True)(x)
+x = GRU(64)(x)
+outputs = Dense(256, activation='softmax')(x)
+model = Model(inputs, outputs)
 
 # Compile the model
 model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+model.summary()
+print(model.predict([[0.2]*80]))
 
+tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir="./logs")
 # Train the model
 for _ in range(20):
-    model.fit(train_data, train_labels, epochs=1, batch_size=256)
+    model.fit(train_data, train_labels, epochs=1, batch_size=256, callbacks=[tensorboard_callback])
+    print(model.predict([[0.2] * 80]))
     model.save(filepath="model2")
